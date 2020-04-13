@@ -23,37 +23,41 @@ def trainESN(net,
              figsize=(13, 6.5)):
     """GenESN training loop function"""
 
-    for i in range(n_epoch):
+    try:
+        for i in range(n_epoch):
 
-        if random_batching:
-            batch_ix      = to_matrix(sample(data, batch_size), token_to_id, max_len=max_length)
-            batch_ix      = torch.tensor(batch_ix, dtype=torch.int64)
-            one_hot_batch = torch.nn.functional.one_hot(batch_ix, len(tokens))
-        else:
-            batch_ix      = to_matrix(data[i * batch_size:(i+1) * batch_size], token_to_id, max_len=max_length)
-            batch_ix      = torch.tensor(batch_ix, dtype=torch.int64)
-            one_hot_batch = torch.nn.functional.one_hot(batch_ix, len(tokens))
+            if random_batching:
+                batch_ix      = to_matrix(sample(data, batch_size), token_to_id, max_len=max_length)
+                batch_ix      = torch.tensor(batch_ix, dtype=torch.int64)
+                one_hot_batch = torch.nn.functional.one_hot(batch_ix, len(tokens))
+            else:
+                batch_ix      = to_matrix(data[i * batch_size:(i+1) * batch_size], token_to_id, max_len=max_length)
+                batch_ix      = torch.tensor(batch_ix, dtype=torch.int64)
+                one_hot_batch = torch.nn.functional.one_hot(batch_ix, len(tokens))
 
-        sequence           = compute_state(net, one_hot_batch)
-        predicted_seq      = sequence[:, :-1]
-        actual_next_tokens = batch_ix[:, 1:].long().to(device)
+            sequence           = compute_state(net, one_hot_batch)
+            predicted_seq      = sequence[:, :-1]
+            actual_next_tokens = batch_ix[:, 1:].long().to(device)
 
-        # loss = lm_cross_entropy(predictions_logp,actual_next_tokens)
-        loss = - torch.mean(torch.gather(predicted_seq, dim=2, index=actual_next_tokens[:, :, None]))
-        loss.backward()
-        opt.step()
-        opt.zero_grad()
+            # loss = lm_cross_entropy(predictions_logp,actual_next_tokens)
+            loss = - torch.mean(torch.gather(predicted_seq, dim=2, index=actual_next_tokens[:, :, None]))
+            loss.backward()
+            opt.step()
+            opt.zero_grad()
 
-        history.append(loss.data.cpu().numpy())
-        lr_scheduler.step(loss)
-        if (i + 1) % 100 == 0 or i == 1:
-            plt.figure(figsize=figsize)
-            plt.grid()
-            clear_output(True)
-            plt.plot(history, '.-',
-                     label='loss, lr = {}, epochs={} '.format(opt.param_groups[0]['lr'], i))
-            plt.legend()
-            plt.show()
+            history.append(loss.data.cpu().numpy())
+            lr_scheduler.step(loss)
+            if (i + 1) % 100 == 0 or i == 1:
+                plt.figure(figsize=figsize)
+                plt.grid()
+                clear_output(True)
+                plt.plot(history, '.-',
+                         label='loss, lr = {}, epochs={} '.format(opt.param_groups[0]['lr'], i))
+                plt.legend()
+                plt.show()
+    except KeyboardInterrupt:
+        print('KeyboardInterrupt, stoping...')
+        return
 
 
 def to_matrix(data,

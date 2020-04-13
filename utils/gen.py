@@ -17,7 +17,7 @@ def generate_sample(net,
                     device=torch.device('cuda')):
 
     x_sequence = [token_to_id[token] for token in seed_phrase]
-    x_sequence = torch.tensor([x_sequence], dtype=torch.int64).to(device)
+    x_sequence = torch.tensor([x_sequence], dtype=torch.int64, required_grad=False).to(device)
 
     with torch.no_grad():
         hid_state = net.init_hidden()
