@@ -41,8 +41,8 @@ def trainESN(net,
             predicted_seq      = sequence[:, :-1]
             actual_next_tokens = batch_ix[:, 1:].long().to(device)
 
-            # loss = lm_cross_entropy(predictions_logp,actual_next_tokens)
-            loss = - torch.mean(torch.gather(predicted_seq, dim=2, index=actual_next_tokens[:, :, None]))
+            loss = lm_cross_entropy(predicted_seq, actual_next_tokens)
+            # loss = - torch.mean(torch.gather(predicted_seq, dim=2, index=actual_next_tokens[:, :, None]))
             loss.backward()
             opt.step()
             opt.zero_grad()
@@ -65,6 +65,12 @@ def trainESN(net,
     except KeyboardInterrupt:
         print('KeyboardInterrupt, stoping...')
         return
+
+
+def lm_cross_entropy(pred, target):
+    target_flat = target.view(-1)
+    pred_flat = pred.reshape(pred.shape[0]*pred.shape[1], pred.shape[-1])
+    return F.cross_entropy(pred_flat, target_flat, ignore_index=0)
 
 
 def to_matrix(data,
