@@ -20,7 +20,9 @@ def trainESN(net,
              history=[],
              device=torch.device('cuda'),
              random_batching=True,
-             figsize=(13, 6.5)):
+             figsize=(13, 6.5),
+             plot_loss=True,
+             legend=True):
     """GenESN training loop function"""
 
     try:
@@ -47,14 +49,19 @@ def trainESN(net,
 
             history.append(loss.data.cpu().numpy())
             lr_scheduler.step(loss)
-            if (i + 1) % 100 == 0 or i == 1:
-                plt.figure(figsize=figsize)
-                plt.grid()
-                clear_output(True)
-                plt.plot(history, '.-',
-                         label='loss, lr = {}, epochs={} '.format(opt.param_groups[0]['lr'], i))
-                plt.legend()
-                plt.show()
+            if plot_loss:
+                if (i + 1) % 100 == 0 or i == 1:
+                    plt.figure(figsize=figsize)
+                    plt.grid()
+                    clear_output(True)
+                    if legend:
+                        plt.plot(history, '.-',
+                            label='loss, lr = {}, epochs={} '.format(opt.param_groups[0]['lr'], i))
+                    else:
+                        plt.plot(history, '.-', label='loss')
+                    plt.legend()
+                    plt.title('The loss function of ESN')
+                    plt.show()
     except KeyboardInterrupt:
         print('KeyboardInterrupt, stoping...')
         return
