@@ -41,7 +41,7 @@ def trainESN(net,
             predicted_seq      = sequence[:, :-1]
             actual_next_tokens = batch_ix[:, 1:].long().to(device)
 
-            loss = lm_cross_entropy(predicted_seq, actual_next_tokens)
+            loss = cross_entropy(predicted_seq, actual_next_tokens)
             # loss = - torch.mean(torch.gather(predicted_seq, dim=2, index=actual_next_tokens[:, :, None]))
             loss.backward()
             opt.step()
@@ -67,9 +67,11 @@ def trainESN(net,
         return
 
 
-def lm_cross_entropy(pred, target):
+def cross_entropy(pred, target):
+    # print(pred.shape, target.shape)
     target_flat = target.view(-1)
-    pred_flat = pred.reshape(pred.shape[0]*pred.shape[1], pred.shape[-1])
+    pred_flat   = pred.reshape(pred.shape[0]*pred.shape[1], pred.shape[-1])
+    # print(pred_flat.shape, target_flat.shape)
     return F.cross_entropy(pred_flat, target_flat, ignore_index=0)
 
 
