@@ -18,7 +18,10 @@ class GenESN(nn.Module):
                  leaking_rate=1.0,
                  in_scaling=1.0,
                  dropout_rate=0.1,
+                 batch_size=300,
                  device=torch.device('cuda'),
+                 is_feedback=False,
+                 fb_scaling=1.0,
                  **params):
         super(GenESN, self).__init__()
 
@@ -26,7 +29,12 @@ class GenESN(nn.Module):
         self.n_res        = n_res
         self.n_out        = n_out
         self.device       = device
+        self.batch_size   = batch_size
+        self.is_feedback  = is_feedback
         self.leaking_rate = leaking_rate
+
+        if self.is_feedback:
+            self.prev_input = torch.zeros(batch_size, n_out, requires_grad=False).to(self.device)
 
         # reservoir initiation
         try:
@@ -36,12 +44,14 @@ class GenESN(nn.Module):
 
         except:
 
-            self.w_input = self.initiate_input_reservoir(n_res, n_in, scaling=in_scaling).to(device)
+            self.w_input = self.initiate_in_reservoir(n_res, n_in, scaling=in_scaling).to(device)
             self.w_res   = self.initiate_reservoir(density, n_res, spec_radius, device).float()
+            self.w_fb    = self.initiate_fb_reservoir(n_res, n_out, scaling=fb_scaling).to(device)
 
             print('Internal reservoir set')
             n_non_zero = self.w_res[self.w_res > 0.01].shape[0]
-            print('Reservoir has {} non zero values ({:.2%})'.format(n_non_zero, n_non_zero / (n_res ** 2)))
+            print('Reservoir has {} non zero values ({:.2%})' \
+                    .format(n_non_zero, n_non_zero / (n_res ** 2)))
 
         # readout layers
         self.readout_in       = nn.Linear(n_res, lin_size)
@@ -55,9 +65,13 @@ class GenESN(nn.Module):
 
 
     def forward(self, input, hidden_state):
-
-        hidden_state = torch.mm(self.w_input, input.T) + self.leaking_rate * torch.mm(self.w_res, hidden_state)
-        hidden_state = torch.tanh(hidden_state)
+        state = torch.mm(self.w_input, input.T) + torch.mm(self.w_res, hidden_state)
+        hidden_state =  hidden_state * (1 - self.leaking_rate)
+        if self.is_feedback:
+            hidden_state += self.leaking_rate * torch.tanh(state + torch.mm(self.w_fb, self.prev_input.T))
+            self.prev_input = input
+        else:
+            hidden_state += self.leaking_rate * torch.tanh(state)
 
         output = self.readout_in(hidden_state.T)
         if self.hidden_ro_layers:
@@ -72,10 +86,10 @@ class GenESN(nn.Module):
 
     def init_hidden(self):
         """hidden state initiation"""
-        return Variable(torch.zeros(self.n_res, 1, requires_grad=False)).to(self.device)
+        return Variable(torch.zeros(self.n_res, self.batch_size, requires_grad=False)).to(self.device)
 
 
-    def initiate_input_reservoir(self, n_reservoir, n_input, scaling):
+    def initiate_in_reservoir(self, n_reservoir, n_input, scaling):
 
         w_input = np.random.rand(n_reservoir, n_input) - 0.5
         w_input = w_input * scaling
@@ -83,6 +97,13 @@ class GenESN(nn.Module):
 
         return w_input
 
+
+    def initiate_fb_reservoir(self, n_reservoir, n_output, scaling=1.0):
+
+        w_fb = np.random.rand(n_reservoir, n_output) - 0.5
+        w_fb *= scaling
+        w_fb = torch.tensor(w_fb, dtype=torch.float32, requires_grad=False)
+        return w_fb
 
     def initiate_reservoir(self, density, n_res, spec_radius, device):
 
